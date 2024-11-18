@@ -5,27 +5,53 @@ public class PlayerMovement : MonoBehaviour
     public float speed = 5f; // Forward movement speed
     public float rotationAngle = 90f; // Angle of rotation (90 degrees)
     private bool isTurning = false; // To prevent continuous rotation during a key press
-    private float moveInterval = 0.05f; // Movement interval
+    private Rigidbody rb; // Reference to the Rigidbody
+    private float turnDirection = 0f; // To store rotation input
+
+    void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            Debug.LogError("No Rigidbody component found on the player!");
+            return;
+        }
+
+        // Apply the initial forward velocity
+        rb.velocity = transform.forward * speed;
+
+        // Freeze rotation along physics axes to prevent unintended behavior
+        rb.constraints = RigidbodyConstraints.FreezeRotationX |
+                         RigidbodyConstraints.FreezeRotationY |
+                         RigidbodyConstraints.FreezeRotationZ;
+    }
 
     void Update()
     {
-
-        // Forward movement in intervals
-        Vector3 nextPosition = transform.position + transform.forward * speed * Time.deltaTime;
-        nextPosition = SnapToInterval(nextPosition);
-        transform.position = nextPosition;
-
-        // Turn left or right
+        // Capture rotation input
         if (!isTurning)
         {
             if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
             {
-                StartCoroutine(Rotate(Vector3.up, -rotationAngle));
+                turnDirection = -rotationAngle;
             }
             else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
             {
-                StartCoroutine(Rotate(Vector3.up, rotationAngle));
+                turnDirection = rotationAngle;
             }
+        }
+    }
+
+    void FixedUpdate()
+    {
+        // Maintain constant forward velocity
+        rb.velocity = transform.forward * speed;
+
+        // Handle rotation
+        if (turnDirection != 0 && !isTurning)
+        {
+            StartCoroutine(Rotate(Vector3.up, turnDirection));
+            turnDirection = 0; // Reset turn direction after starting the rotation
         }
     }
 
@@ -33,30 +59,20 @@ public class PlayerMovement : MonoBehaviour
     {
         isTurning = true;
 
-        // Rotate smoothly over time
-        Quaternion from = transform.rotation;
-        Quaternion to = transform.rotation * Quaternion.Euler(axis * angle);
+        // Smoothly rotate using Rigidbody
+        Quaternion initialRotation = rb.rotation;
+        Quaternion targetRotation = rb.rotation * Quaternion.Euler(axis * angle);
         float elapsed = 0f;
-        float duration = 0.2f; // Adjust duration for rotation speed
+        float duration = 0.2f; // Duration of the rotation
 
         while (elapsed < duration)
         {
-            transform.rotation = Quaternion.Slerp(from, to, elapsed / duration);
-            elapsed += Time.deltaTime;
-            yield return null;
+            rb.MoveRotation(Quaternion.Slerp(initialRotation, targetRotation, elapsed / duration));
+            elapsed += Time.fixedDeltaTime; // Use fixedDeltaTime for physics updates
+            yield return new WaitForFixedUpdate();
         }
 
-        transform.rotation = to;
+        rb.MoveRotation(targetRotation); // Ensure exact final rotation
         isTurning = false;
-    }
-
-    // Snaps a position to the nearest interval
-    private Vector3 SnapToInterval(Vector3 position)
-    {
-        return new Vector3(
-            Mathf.Round(position.x / moveInterval) * moveInterval,
-            position.y,
-            Mathf.Round(position.z / moveInterval) * moveInterval
-        );
     }
 }
