@@ -8,6 +8,9 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody rb; // Reference to the Rigidbody
     private float turnDirection = 0f; // To store rotation input
 
+    public Vector3 respawnPosition; // The position where the player respawns
+    public int lives = 3; // Number of lives the player has
+
     void Start()
     {
         rb = GetComponent<Rigidbody>();
@@ -74,5 +77,30 @@ public class PlayerMovement : MonoBehaviour
 
         rb.MoveRotation(targetRotation); // Ensure exact final rotation
         isTurning = false;
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Ghost"))
+        {
+            LoseLife();
+        }
+    }
+
+    private void LoseLife()
+    {
+        lives--;
+
+        if (lives > 0)
+        {
+            // Respawn the player
+            rb.position = respawnPosition;
+            rb.velocity = transform.forward * speed; // Reset forward velocity
+        }
+        else
+        {
+            // Handle game over (e.g., show a game over screen)
+            Debug.Log("Game Over!");
+        }
     }
 }
